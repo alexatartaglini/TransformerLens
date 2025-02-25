@@ -17,10 +17,12 @@ from transformers import (
     AutoModelForCausalLM,
     BertForPreTraining,
     T5ForConditionalGeneration,
+    MllamaForConditionalGeneration,
 )
 
 import transformer_lens.utils as utils
 from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
+from transformer_lens.HookedVLMConfig import HookedVLMConfig
 from transformer_lens.pretrained.weight_conversions import (
     convert_bert_weights,
     convert_bloom_weights,
@@ -29,6 +31,7 @@ from transformer_lens.pretrained.weight_conversions import (
     convert_gpt2_weights,
     convert_gptj_weights,
     convert_llama_weights,
+    convert_mllama_weights,
     convert_mingpt_weights,
     convert_mistral_weights,
     convert_mixtral_weights,
@@ -159,6 +162,7 @@ OFFICIAL_MODEL_NAMES = [
     "meta-llama/Llama-3.2-3B",
     "meta-llama/Llama-3.2-1B-Instruct",
     "meta-llama/Llama-3.2-3B-Instruct",
+    "meta-llama/Llama-3.2-11B-Vision-Instruct",
     "meta-llama/Llama-3.3-70B-Instruct",
     "Baidicoot/Othello-GPT-Transformer-Lens",
     "bert-base-cased",
@@ -584,6 +588,7 @@ MODEL_ALIASES = {
         "meta-llama/Llama-2-13b-chat-hf",
     ],
     "meta-llama/Llama-2-70b-chat-hf": ["Llama-2-70b-chat", "meta-llama-2-70b-chat-hf"],
+    "meta-llama/Llama-3.2-11B-Vision-Instruct": ["Llama-3.2-11B-Vision-Instruct"],
     "codellama/CodeLlama-7b-hf": ["CodeLlamallama-2-7b", "codellama/CodeLlama-7b-hf"],
     "codellama/CodeLlama-7b-Python-hf": [
         "CodeLlama-7b-python",
@@ -745,7 +750,9 @@ def convert_hf_model_config(model_name: str, **kwargs):
         official_model_name = get_official_model_name(model_name)
 
     # Load HuggingFace model config
-    if "llama" in official_model_name.lower():
+    if "llama" in official_model_name.lower() and "vision" in official_model_name.lower():
+        architecture = "MllamaForConditionalGeneration"
+    elif "llama" in official_model_name.lower():
         architecture = "LlamaForCausalLM"
     elif "gemma-2" in official_model_name.lower():
         architecture = "Gemma2ForCausalLM"
@@ -963,6 +970,47 @@ def convert_hf_model_config(model_name: str, **kwargs):
             "NTK_by_parts_low_freq_factor": 1.0,
             "NTK_by_parts_high_freq_factor": 4.0,
             "NTK_by_parts_factor": 32.0,
+        }
+    elif "Llama-3.2-11B-Vision" in official_model_name:
+        cfg_dict = {
+            "d_model_language": 4096,
+            "d_head_language": 128,
+            "n_heads_language": 32,
+            "d_mlp_language": 14336,
+            "n_layers_language": 40,
+            "n_ctx_language": 2048,
+            "eps_language": 1e-5,
+            "d_vocab": 128256,
+            "act_fn_language": "silu",
+            "n_key_value_heads": 8,
+            "normalization_type_language": "RMS",
+            "positional_embedding_type": "rotary",
+            "rotary_adjacent_pairs": False,
+            "rotary_dim": 128,
+            "final_rms_language": True,
+            "final_rms_vision": False,
+            "gated_mlp": True,
+            "rotary_base": 500000.0,
+            "use_NTK_by_parts_rope": True,
+            "NTK_by_parts_low_freq_factor": 1.0,
+            "NTK_by_parts_high_freq_factor": 4.0,
+            "NTK_by_parts_factor": 8.0,
+            "d_model_vision": 1280,
+            "d_head_vision": 80,
+            "n_heads_vision": 16,
+            "d_mlp_vision": 5120,
+            "n_layers_vision": 32,
+            "n_layers_global": 8,
+            "image_size": 560,
+            "patch_size": 14,
+            "num_channels": 3,
+            "n_ctx_vision": int((560**2) / (14**2)),
+            "eps_vision": 1e-5,
+            "act_fn_vision": "gelu",
+            "normalization_type_vision": "LN",
+            "output_dim_vision": 7680,
+            "cross_attn_layers": [3, 8, 13, 18, 23, 28, 33, 38],
+            "vision_intermediate_layer_idx": [3, 7, 15, 23, 30],
         }
     elif "Llama-3.3-70B" in official_model_name:
         cfg_dict = {
@@ -1496,7 +1544,10 @@ def convert_hf_model_config(model_name: str, **kwargs):
     # All of these models use LayerNorm
     cfg_dict["original_architecture"] = architecture
     # The name such that AutoTokenizer.from_pretrained works
-    cfg_dict["tokenizer_name"] = official_model_name
+    if "llama" in official_model_name.lower() and "vision" in official_model_name.lower():
+        cfg_dict["processor_name"] = official_model_name
+    else:
+        cfg_dict["tokenizer_name"] = official_model_name
     if kwargs.get("trust_remote_code", False):
         cfg_dict["trust_remote_code"] = True
     return cfg_dict
@@ -1637,12 +1688,21 @@ def get_pretrained_model_config(
     cfg_dict["dtype"] = dtype
 
     if fold_ln:
-        if cfg_dict["normalization_type"] in ["LN", "LNPre"]:
-            cfg_dict["normalization_type"] = "LNPre"
-        elif cfg_dict["normalization_type"] in ["RMS", "RMSPre"]:
-            cfg_dict["normalization_type"] = "RMSPre"
+        if "llama" in official_model_name.lower() and "vision" in official_model_name.lower():
+            for normalization_key in ["normalization_type_language", "normalization_type_vision"]:
+                if cfg_dict[normalization_key] in ["LN", "LNPre"]:
+                    cfg_dict[normalization_key] = "LNPre"
+                elif cfg_dict[normalization_key] in ["RMS", "RMSPre"]:
+                    cfg_dict[normalization_key] = "RMSPre"
+                else:
+                    logging.warning("Cannot fold in layer norm, normalization_type is not LN.")
         else:
-            logging.warning("Cannot fold in layer norm, normalization_type is not LN.")
+            if cfg_dict["normalization_type"] in ["LN", "LNPre"]:
+                cfg_dict["normalization_type"] = "LNPre"
+            elif cfg_dict["normalization_type"] in ["RMS", "RMSPre"]:
+                cfg_dict["normalization_type"] = "RMSPre"
+            else:
+                logging.warning("Cannot fold in layer norm, normalization_type is not LN.")
 
     if checkpoint_index is not None or checkpoint_value is not None:
         checkpoint_labels, checkpoint_label_type = get_checkpoint_labels(
@@ -1679,7 +1739,10 @@ def get_pretrained_model_config(
     if first_n_layers is not None:
         cfg_dict["n_layers"] = first_n_layers
 
-    cfg = HookedTransformerConfig.from_dict(cfg_dict)
+    if "llama" in official_model_name.lower() and "vision" in official_model_name.lower():
+        cfg = HookedVLMConfig.from_dict(cfg_dict)
+    else:
+        cfg = HookedTransformerConfig.from_dict(cfg_dict)
     return cfg
 
 
@@ -1842,6 +1905,13 @@ def get_pretrained_state_dict(
                     token=huggingface_token if len(huggingface_token) > 0 else None,
                     **kwargs,
                 )
+            elif "llama" in official_model_name.lower() and "vision" in official_model_name.lower():
+                hf_model = MllamaForConditionalGeneration.from_pretrained(
+                    official_model_name,
+                    torch_dtype=dtype,
+                    token=huggingface_token if len(huggingface_token) > 0 else None,
+                    **kwargs,
+                )
             else:
                 hf_model = AutoModelForCausalLM.from_pretrained(
                     official_model_name,
@@ -1867,6 +1937,8 @@ def get_pretrained_state_dict(
             state_dict = convert_neox_weights(hf_model, cfg)
         elif cfg.original_architecture == "LlamaForCausalLM":
             state_dict = convert_llama_weights(hf_model, cfg)
+        elif cfg.original_architecture == "MllamaForConditionalGeneration":
+            state_dict = convert_mllama_weights(hf_model, cfg)
         elif cfg.original_architecture == "BertForMaskedLM":
             state_dict = convert_bert_weights(hf_model, cfg)
         elif cfg.original_architecture == "T5ForConditionalGeneration":

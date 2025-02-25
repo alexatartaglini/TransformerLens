@@ -10,6 +10,7 @@ from .abstract_attention import AbstractAttention
 from .layer_norm import LayerNorm
 from .layer_norm_pre import LayerNormPre
 from .pos_embed import PosEmbed
+from .gated_pos_embed import GatedPosEmbed
 from .rms_norm import RMSNorm
 from .rms_norm_pre import RMSNormPre
 from .token_typed_embed import TokenTypeEmbed
@@ -17,8 +18,10 @@ from .unembed import Unembed
 
 # Only dependent on independent modules
 from .attention import Attention
+from .cross_attention import CrossAttention
 from .bert_mlm_head import BertMLMHead
 from .embed import Embed
+from .patch_embed import PatchEmbed
 from .grouped_query_attention import GroupedQueryAttention
 from .mlps.gated_mlp import GatedMLP
 from .mlps.mlp import MLP
@@ -28,5 +31,6 @@ from .bert_block import BertBlock
 from .bert_embed import BertEmbed
 from .mlps.moe import MoE
 from .transformer_block import TransformerBlock
+from .cross_attention_block import CrossAttentionBlock
 from .t5_attention import T5Attention
 from .t5_block import T5Block

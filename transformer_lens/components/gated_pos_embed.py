@@ -15,7 +15,7 @@ from transformer_lens.utils import get_offset_position_ids
 
 
 # Positional Embeddings
-class PosEmbed(nn.Module):
+class GatedPosEmbed(nn.Module):  # TODO: implement
     def __init__(self, cfg: Union[Dict, HookedTransformerConfig, HookedVLMConfig]):
         super().__init__()
         if isinstance(cfg, HookedTransformerConfig) or isinstance(cfg, Dict):

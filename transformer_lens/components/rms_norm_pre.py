@@ -10,13 +10,17 @@ from jaxtyping import Float
 
 from transformer_lens.hook_points import HookPoint
 from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
+from transformer_lens.HookedVLMConfig import HookedVLMConfig
 
 
 class RMSNormPre(nn.Module):
-    def __init__(self, cfg: Union[Dict, HookedTransformerConfig]):
+    def __init__(self, cfg: Union[Dict, HookedTransformerConfig, HookedVLMConfig]):
         """RMSNormPre - LayerNormPre without the centering and bias (RMS = Root Mean Square)"""
         super().__init__()
-        self.cfg = HookedTransformerConfig.unwrap(cfg)
+        if isinstance(cfg, HookedTransformerConfig) or isinstance(cfg, Dict):
+            self.cfg = HookedTransformerConfig.unwrap(cfg)
+        else:
+            self.cfg = HookedVLMConfig.unwrap(cfg)
         self.eps = self.cfg.eps
 
         # Adds a hook point for the normalisation scale factor

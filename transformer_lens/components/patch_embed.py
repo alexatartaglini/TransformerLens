@@ -13,8 +13,8 @@ from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
 from transformer_lens.HookedVLMConfig import HookedVLMConfig
 
 
-# Embed & Unembed
-class Embed(nn.Module):
+# Embed & Unembed  # TODO: implement
+class PatchEmbed(nn.Module):
     def __init__(self, cfg: Union[Dict, HookedTransformerConfig, HookedVLMConfig], additional_tokens: int = 0):
         super().__init__()
         if isinstance(cfg, HookedTransformerConfig) or isinstance(cfg, Dict):

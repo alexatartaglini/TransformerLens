@@ -10,6 +10,7 @@ from transformers.utils import is_bitsandbytes_available
 
 from transformer_lens.components import AbstractAttention
 from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
+from transformer_lens.HookedVLMConfig import HookedVLMConfig
 
 if is_bitsandbytes_available():
     from bitsandbytes.nn.modules import Params4bit
@@ -19,7 +20,7 @@ if is_bitsandbytes_available():
 class Attention(AbstractAttention):
     def __init__(
         self,
-        cfg: Union[Dict, HookedTransformerConfig],
+        cfg: Union[Dict, HookedTransformerConfig, HookedVLMConfig],
         attn_type: str = "global",
         layer_id: Optional[int] = None,
     ):
@@ -33,7 +34,10 @@ class Attention(AbstractAttention):
             layer_id (int, optional): The index of the current layer. Used by the Mistal models (labelled here as stanford-gpt2) to scale down attention scores pre softmax for numerical stability reasons by 1/(layer_id+1). Defaults to None.
         """
         super().__init__(cfg, attn_type, layer_id)
-        self.cfg = HookedTransformerConfig.unwrap(cfg)
+        if isinstance(cfg, HookedTransformerConfig) or isinstance(cfg, Dict):
+            self.cfg = HookedTransformerConfig.unwrap(cfg)
+        else:
+            self.cfg = HookedVLMConfig.unwrap(cfg)
 
         if self.cfg.load_in_4bit:
             # 4-bit quantization convention

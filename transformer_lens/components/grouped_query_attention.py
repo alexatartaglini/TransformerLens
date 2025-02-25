@@ -6,13 +6,14 @@ from jaxtyping import Float
 
 from transformer_lens.components import AbstractAttention
 from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
+from transformer_lens.HookedVLMConfig import HookedVLMConfig
 from transformer_lens.utilities.attention import complex_attn_linear, simple_attn_linear
 
 
 class GroupedQueryAttention(AbstractAttention):
     def __init__(
         self,
-        cfg: Union[Dict, HookedTransformerConfig],
+        cfg: Union[Dict, HookedTransformerConfig, HookedVLMConfig],
         attn_type: str = "global",
         layer_id: Union[int, None] = None,
     ):
@@ -27,7 +28,10 @@ class GroupedQueryAttention(AbstractAttention):
             attn_type (str, optional): "global" or "local", used by GPT-Neo. Local attention means the model can only attend back cfg.window_size tokens (here, 256). Not used by any other model at the moment. Defaults to "global".
             layer_id (int, optional): The index of the current layer. Used by the Mistal models (labelled here as stanford-gpt2) to scale down attention scores pre softmax for numerical stability reasons by 1/(layer_id+1). Defaults to None.
         """
-        cfg = HookedTransformerConfig.unwrap(cfg)
+        if isinstance(cfg, HookedTransformerConfig) or isinstance(cfg, Dict):
+            cfg = HookedTransformerConfig.unwrap(cfg)
+        else:
+            cfg = HookedVLMConfig.unwrap(cfg)
         assert cfg.n_key_value_heads is not None
         super().__init__(cfg, attn_type, layer_id)
         self.repeat_kv_heads = cfg.n_heads // cfg.n_key_value_heads

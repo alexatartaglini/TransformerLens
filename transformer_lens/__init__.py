@@ -7,6 +7,8 @@ from .past_key_value_caching import (
 )
 from . import components
 from . import factories
+from .HookedVLMConfig import HookedVLMConfig
+from .HookedVLM import HookedVLM
 from .HookedTransformerConfig import HookedTransformerConfig
 from .FactoredMatrix import FactoredMatrix
 from .ActivationCache import ActivationCache

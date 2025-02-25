@@ -13,6 +13,7 @@ from transformers.utils import is_bitsandbytes_available
 from transformer_lens.FactoredMatrix import FactoredMatrix
 from transformer_lens.hook_points import HookPoint
 from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
+from transformer_lens.HookedVLMConfig import HookedVLMConfig
 from transformer_lens.past_key_value_caching import HookedTransformerKeyValueCacheEntry
 from transformer_lens.utilities.attention import complex_attn_linear, simple_attn_linear
 from transformer_lens.utils import get_offset_position_ids
@@ -27,7 +28,7 @@ class AbstractAttention(ABC, nn.Module):
 
     def __init__(
         self,
-        cfg: Union[Dict, HookedTransformerConfig],
+        cfg: Union[Dict, HookedTransformerConfig, HookedVLMConfig],
         attn_type: str = "global",
         layer_id: Optional[int] = None,
     ):
@@ -43,7 +44,10 @@ class AbstractAttention(ABC, nn.Module):
             layer_id (int, optional): The index of the current layer. Used by the Mistral models (labelled here as stanford-gpt2) to scale down attention scores pre softmax for numerical stability reasons by 1/(layer_id+1). Defaults to None.
         """
         super().__init__()
-        self.cfg = HookedTransformerConfig.unwrap(cfg)
+        if isinstance(cfg, HookedTransformerConfig) or isinstance(cfg, Dict):
+            self.cfg = HookedTransformerConfig.unwrap(cfg)
+        else:
+            self.cfg = HookedVLMConfig.unwrap(cfg)
 
         if self.cfg.load_in_4bit:
             nq = int((self.cfg.d_model * self.cfg.d_head * self.cfg.n_heads) / 2)

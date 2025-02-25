@@ -10,17 +10,21 @@ from jaxtyping import Float
 
 from transformer_lens.hook_points import HookPoint
 from transformer_lens.HookedTransformerConfig import HookedTransformerConfig
+from transformer_lens.HookedVLMConfig import HookedVLMConfig
 
 
 class LayerNorm(nn.Module):
-    def __init__(self, cfg: Union[Dict, HookedTransformerConfig], length: Optional[int] = None):
+    def __init__(self, cfg: Union[Dict, HookedTransformerConfig, HookedVLMConfig], length: Optional[int] = None):
         """
         LayerNorm with optional length parameter
 
         length (Optional[int]): If the dimension of the LayerNorm. If not provided, assumed to be d_model
         """
         super().__init__()
-        self.cfg = HookedTransformerConfig.unwrap(cfg)
+        if isinstance(cfg, HookedTransformerConfig) or isinstance(cfg, Dict):
+            self.cfg = HookedTransformerConfig.unwrap(cfg)
+        else:
+            self.cfg = HookedVLMConfig.unwrap(cfg)
         self.eps = self.cfg.eps
         if length is None:
             self.length = self.cfg.d_model
